@@ -32,7 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 
-cat >> .gitignore <<'EOF'
 
 ### macOS ###
 .DS_Store
@@ -48,4 +47,3 @@ out/
 ### Logs ###
 *.log
 logs/
-EOF
