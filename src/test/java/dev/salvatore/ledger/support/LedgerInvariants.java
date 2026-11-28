@@ -57,4 +57,28 @@ public final class LedgerInvariants {
                 "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE id IN (" + in + ")", Long.class, args);
         assertThat(total).as("sum of all balances in the group").isZero();
     }
+
+    /**
+     * System-wide: the balances of all the accounts in a currency sum to zero (the sum of all
+     * ledger movements per currency is zero, since every transaction is balanced).
+     */
+    public static void assertCurrencyIsBalanced(JdbcTemplate jdbc, String currency) {
+        Long total = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE currency = ?", Long.class, currency);
+        assertThat(total).as("sum of all balances in " + currency).isZero();
+    }
+
+    /**
+     * System-wide: the transit account of a currency holds exactly the amount of the orders
+     * that are PAID or CONFIRMED in that currency.
+     */
+    public static void assertTransitMatchesOpenOrders(JdbcTemplate jdbc, String currency) {
+        Long transit = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE type = 'TRANSIT' AND currency = ?",
+                Long.class, currency);
+        Long open = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(amount), 0) FROM orders WHERE currency = ? AND status IN ('PAID', 'CONFIRMED')",
+                Long.class, currency);
+        assertThat(transit).as("transit balance must equal the orders in PAID or CONFIRMED").isEqualTo(open);
+    }
 }
