@@ -5,28 +5,28 @@ import dev.salvatore.ledger.domain.exception.AccountNotFoundException;
 import dev.salvatore.ledger.domain.exception.CurrencyMismatchException;
 import dev.salvatore.ledger.domain.ledger.LedgerTransaction;
 import dev.salvatore.ledger.domain.ledger.LedgerTransaction.EntryDraft;
-import dev.salvatore.ledger.repository.AccountRepository;
 import dev.salvatore.ledger.repository.LedgerTransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Moves money between two accounts. This is the only place that locks accounts and changes
- * balances, so the lock ordering below holds for the whole application.
+ * Moves money between two accounts. Accounts are always locked through {@link AccountLocker},
+ * so the lock ordering holds for the whole application.
  */
 @Service
 public class TransferService {
 
-    private final AccountRepository accountRepository;
+    private final AccountLocker accountLocker;
     private final LedgerTransactionRepository ledgerTransactionRepository;
 
-    public TransferService(AccountRepository accountRepository,
+    public TransferService(AccountLocker accountLocker,
                            LedgerTransactionRepository ledgerTransactionRepository) {
-        this.accountRepository = accountRepository;
+        this.accountLocker = accountLocker;
         this.ledgerTransactionRepository = ledgerTransactionRepository;
     }
 
@@ -54,14 +54,9 @@ public class TransferService {
             throw new IllegalArgumentException("source and destination accounts must be different");
         }
 
-        // Always lock in ascending id order, whatever the direction of the transfer: two
-        // opposite transfers (A to B and B to A) then queue on the same first lock instead
-        // of each holding one account and waiting for the other (deadlock).
-        boolean sourceFirst = sourceAccountId.compareTo(destinationAccountId) < 0;
-        Account first = lock(sourceFirst ? sourceAccountId : destinationAccountId);
-        Account second = lock(sourceFirst ? destinationAccountId : sourceAccountId);
-        Account source = sourceFirst ? first : second;
-        Account destination = sourceFirst ? second : first;
+        Map<UUID, Account> locked = accountLocker.lockAll(List.of(sourceAccountId, destinationAccountId));
+        Account source = locked.get(sourceAccountId);
+        Account destination = locked.get(destinationAccountId);
 
         if (!source.getCurrency().equals(destination.getCurrency())) {
             throw new CurrencyMismatchException(source.getCurrency(), destination.getCurrency());
@@ -78,10 +73,5 @@ public class TransferService {
 
         // Flush now so a duplicate reference (UNIQUE constraint) fails inside this transaction.
         return ledgerTransactionRepository.saveAndFlush(transaction);
-    }
-
-    private Account lock(UUID accountId) {
-        return accountRepository.findByIdForUpdate(accountId)
-                .orElseThrow(() -> new AccountNotFoundException(accountId));
     }
 }

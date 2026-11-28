@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface LedgerTransactionRepository extends JpaRepository<LedgerTransaction, UUID> {
 
     Optional<LedgerTransaction> findByReference(String reference);
+
+    boolean existsByReference(String reference);
 }

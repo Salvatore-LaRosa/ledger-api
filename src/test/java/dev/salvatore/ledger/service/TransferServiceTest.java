@@ -51,7 +51,7 @@ class TransferServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TransferService(accountRepository, ledgerTransactionRepository);
+        service = new TransferService(new AccountLocker(accountRepository), ledgerTransactionRepository);
     }
 
     @Test
