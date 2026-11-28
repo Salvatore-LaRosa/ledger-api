@@ -9,5 +9,10 @@ package dev.salvatore.ledger.domain.ledger;
  */
 public enum EntryDirection {
     DEBIT,
-    CREDIT
+    CREDIT;
+
+    /** The direction that cancels this one. */
+    public EntryDirection opposite() {
+        return this == DEBIT ? CREDIT : DEBIT;
+    }
 }

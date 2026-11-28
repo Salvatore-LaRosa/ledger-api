@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import dev.salvatore.ledger.domain.exception.ReversalNotAllowedException;
+
 /**
  * An atomic, balanced set of ledger entries (double-entry bookkeeping).
  * <p>
@@ -103,6 +105,29 @@ public class LedgerTransaction {
                     new LedgerEntry(transaction, draft.account(), draft.direction(), draft.amount()));
         }
         return transaction;
+    }
+
+    /**
+     * Builds the transaction that cancels this one: same accounts and amounts, opposite
+     * directions. History is never edited: a mistake is fixed by appending this reversal.
+     *
+     * @throws IllegalStateException       if this transaction has not been persisted yet
+     * @throws ReversalNotAllowedException if this transaction is itself a reversal
+     */
+    public LedgerTransaction reverse(String reference) {
+        if (id == null) {
+            throw new IllegalStateException("only a persisted transaction can be reversed");
+        }
+        if (reversalOfId != null) {
+            throw new ReversalNotAllowedException(id, "a reversal cannot be reversed");
+        }
+        List<EntryDraft> drafts = entries.stream()
+                .map(entry -> new EntryDraft(
+                        entry.getAccount(), entry.getDirection().opposite(), entry.getAmount()))
+                .toList();
+        LedgerTransaction reversal = create(reference, drafts);
+        reversal.reversalOfId = id;
+        return reversal;
     }
 
     public UUID getId() {
