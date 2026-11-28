@@ -71,7 +71,7 @@ public class ReversalService {
         return ledgerTransactionRepository.saveAndFlush(reversal);
     }
 
-    static String referenceFor(UUID transactionId) {
+    public static String referenceFor(UUID transactionId) {
         return "reversal:" + transactionId;
     }
 }
